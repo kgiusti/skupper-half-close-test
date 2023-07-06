@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License
+#
+
+#
+# Test server that handles half-close TCP transfers
+# Listens for incoming connections from skrouterd at 0.0.0.0:8000
+#
+
+import socket
+import sys
+
+from time import sleep
+
+# Usage: server-half-close <host-address <port>>
+
+pause = 2.0  # pause between operations
+
+def main(argv):
+
+    host_address = argv[1] if len(argv) > 1 else "0.0.0.0"
+    port = int(argv[2]) if len(argv) > 2 else 8800
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind((host_address, port))
+        listener.setblocking(True)
+        listener.listen(100)
+
+        try:
+            while True:
+                conn, _ = listener.accept()
+                print("Server: new client connection accepted")
+                try:
+                    while True:
+                        data = conn.recv(4096)
+                        if data == b'':
+                            break
+                        print(f"Server: read '{data.decode()}'")
+
+                    print("Server: detected client write close")
+                    sleep(pause)
+                    print("Server: sending response...")
+                    conn.sendall(b'Half-close goodbye!')
+                    print("Server: response sent")
+                    sleep(pause)
+                    print("Server: closing socket...")
+
+                except Exception as exc:
+                    print(f"SERVER ERROR: {exc}")
+
+                conn.close()
+
+        except KeyboardInterrupt:
+            print("Server Done")
+            return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
